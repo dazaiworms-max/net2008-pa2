@@ -50,7 +50,8 @@ class Device:
 def parse_inventory(xml_file):
     """Checks the validity of the XML file provided and parses its inventory"""
     if not os.path.exists(xml_file):
-        sys.exit(f"XML file {xml_file} does not exist")
+        print(f"XML file {xml_file} does not exist")
+        sys.exit(1)
 
     # Is the file valid?
     try:

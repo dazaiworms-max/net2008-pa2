@@ -153,6 +153,21 @@ def check_owner(device):
 
     return None
 
+def check_down_interfaces(device, policy):
+    """Check if the device's down interfaces exceed what the policy allows"""
+    max_allowed = policy.get("max_down_interfaces")
+    if max_allowed is None:
+        return None
+
+    if device.down > max_allowed:
+        return {
+            "device": device.id,
+            "type": "too_many_down",
+            "down": device.down
+        }
+
+    return None
+
 def make_report(report):
     """Generate a JSON audit file report"""
     try:
@@ -231,7 +246,10 @@ def main():
                 violations.append(missing_owner)
                 compliance_check = False
 
-        ########
+        down_interfaces_count = check_down_interfaces(device, policy)
+        if down_interfaces_count != None:
+            violations.append(down_interfaces_count)
+            compliance_check = False
 
         if compliance_check:
             compliant.append(device.id)

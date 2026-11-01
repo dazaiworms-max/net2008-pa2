@@ -143,6 +143,16 @@ def check_role(device, policy):
 
     return None
 
+def check_owner(device):
+    """Check if a device has an owner"""
+    if not hasattr(device, "owner") or not str(device.owner):
+        return {
+            "device": device.id,
+            "type": "missing_owner"
+        }
+
+    return None
+
 def make_report(report):
     """Generate a JSON audit file report"""
     try:
@@ -213,6 +223,13 @@ def main():
         if role_checked != None:
             violations.append(role_checked)
             compliance_check = False
+
+        if policy.get("require_owner"):
+            missing_owner = check_owner(device)
+
+            if missing_owner:
+                violations.append(missing_owner)
+                compliance_check = False
 
         ########
 

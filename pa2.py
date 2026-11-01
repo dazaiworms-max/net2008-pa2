@@ -100,12 +100,14 @@ def load_policy(yaml_file):
     return policy_mapping
 
 def parse_os(os_string):
+    """Parse os string into a tuple for version comparison"""
     try:
         return tuple(int(part) for part in os_string.split("."))
     except (ValueError, AttributeError):
         return (0, )
 
 def check_min_os(device, policy_mapping):
+    """Check if the device os meets the policy os requirement"""
     min_os_policy = policy_mapping.get("min_os")
 
     if not isinstance(min_os_policy, dict):
@@ -122,6 +124,21 @@ def check_min_os(device, policy_mapping):
             "type": "os_outdated",
             "found": device.os,
             "required": required_os
+        }
+
+    return None
+
+def check_role(device, policy):
+    """Check device role against the policy's roles"""
+    min_os_policy = policy.get("min_os")
+    if not isinstance(min_os_policy, dict):
+        return None
+
+    if device.role not in min_os_policy:
+        return{
+            "device": device.id,
+            "type": "unknown_role",
+            "role": device.role
         }
 
     return None
@@ -191,6 +208,13 @@ def main():
         if os_checked != None:
             violations.append(os_checked)
             compliance_check = False
+
+        role_checked = check_role(device, policy)
+        if role_checked != None:
+            violations.append(role_checked)
+            compliance_check = False
+
+        ########
 
         if compliance_check:
             compliant.append(device.id)

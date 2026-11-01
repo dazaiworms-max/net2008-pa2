@@ -79,6 +79,52 @@ def parse_inventory(xml_file):
 
     return site, devices, skipped
 
+def load_policy(yaml_file):
+    """Read in the YAML policy file"""
+    if not os.path.exists(yaml_file):
+        print(f"YAML file {yaml_file} does not exist")
+        sys.exit(1)
+
+    # Checking if the file is valid
+    try:
+        with open(yaml_file, "r", encoding="utf-8") as f:
+            policy_mapping = yaml.safe_load(f)
+    except Exception as e:
+        raise BadFile(f"Error rading YAML policy file {yaml_file}: {e}")
+
+    if not isinstance(policy_mapping, dict):
+        print(f"YAML file {yaml_file} does not have valid mapping")
+        sys.exit(1)
+
+    return policy_mapping
+
+def parse_os(os_string):
+    try:
+        return tuple(int(part) for part in os_string.split("."))
+    except (ValueError, AttributeError):
+        return (0, )
+
+def check_min_os(device, policy_mapping):
+    min_os_policy = policy_mapping.get("min_os")
+
+    if not isinstance(min_os_policy, dict):
+        print (f"YAML policy file is not a valid mapping")
+        sys.exit(1)
+
+    required_os = min_os_policy.get(device.role)
+    if required_os == None:
+        return None
+
+    if parse_os(device.os) < parse_os(required_os):
+        return {
+            "device": device.id,
+            "type": "os_outdated",
+            "found": device.os,
+            "required": required_os
+        }
+
+    return None
+
 def make_report(report):
     """Generate a JSON audit file report"""
     try:
@@ -104,7 +150,9 @@ def main():
 	    "total_devices": 0,
 	    "skipped_devices": 0,
 	    "roles": None,
-	    "interfaces": {"up": 0, "down": 0, "other": 0}
+	    "interfaces": {"up": 0, "down": 0, "other": 0},
+        "violations": None,
+        "compliant": None
     }
 
     if os.path.getsize(xml_file) == 0:
@@ -116,28 +164,47 @@ def main():
         print(f"Error: {e}")
         sys.exit(1)
 
+    try:
+        policy = load_policy(yaml_file)
+    except BadFile as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
     # Count to tally for report
     roles = {}
     all_up = 0
     all_down = 0
     all_other = 0
+    violations = []
+    compliance_check = True
+    compliant = []
 
     for device in devices:
+        compliance_check = True
         roles[device.role] = roles.get(device.role, 0) +1
         all_up += device.up
         all_down += device.down
         all_other += device.other
+        
+        os_checked = check_min_os(device, policy)
+        if os_checked != None:
+            violations.append(os_checked)
+            compliance_check = False
+
+        if compliance_check:
+            compliant.append(device.id)
 
     report = {
         "site": site,
 	    "total_devices": len(devices),
 	    "skipped_devices": skipped,
 	    "roles": roles,
-	    "interfaces": {"up": all_up, "down": all_down, "other": all_other}
+	    "interfaces": {"up": all_up, "down": all_down, "other": all_other},
+        "violations": violations,
+        "compliant": compliant
     }
 
     make_report(report)
 
-    print(f"done")
 if __name__ == "__main__":
     main()
